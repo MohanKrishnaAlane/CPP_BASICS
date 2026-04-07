@@ -1,3 +1,4 @@
+
 ---
 name: habit-tracker
 description: A daily habit coach that helps users build, track, and reflect on personal habits and streaks. Use when the user mentions habits, routines, streaks, daily goals, self-improvement, or wants to stay consistent with something.
