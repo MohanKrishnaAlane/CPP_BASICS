@@ -1,0 +1,562 @@
+import { useState, useEffect, useCallback } from “react”;
+
+const HABITS = [
+{ id: “wake”, label: “Wake Before 7:30 AM”, emoji: “🌅”, color: “#E8913A” },
+{ id: “fitness”, label: “Workout / Exercise”, emoji: “💪”, color: “#4CAF50” },
+{ id: “dsa”, label: “DSA / Algo Practice”, emoji: “🧩”, color: “#5C6BC0” },
+{ id: “sysdesign”, label: “System Design”, emoji: “🏗️”, color: “#00897B” },
+{ id: “cpp”, label: “C++ Practice”, emoji: “⚙️”, color: “#EF5350” },
+{ id: “x_limit”, label: “X < 10 min”, emoji: “📵”, color: “#78909C” },
+];
+
+const DAYS = [“Mon”, “Tue”, “Wed”, “Thu”, “Fri”, “Sat”, “Sun”];
+const MOTIVATIONS = [
+“Show up. Even when it’s ugly.”,
+“You don’t need motivation. You need a system.”,
+“Day 2 is harder than Day 30. Keep going.”,
+“Small wins compound into big changes.”,
+“Don’t break the chain.”,
+“Discipline is choosing between what you want now and what you want most.”,
+“The pain of staying the same > the pain of change.”,
+];
+
+function getWeekId(date) {
+const d = new Date(date);
+d.setHours(0, 0, 0, 0);
+const dayNum = d.getDay() || 7;
+d.setDate(d.getDate() + 4 - dayNum);
+const yearStart = new Date(d.getFullYear(), 0, 1);
+const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+return `${d.getFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+function getWeekDates(offset = 0) {
+const now = new Date();
+now.setDate(now.getDate() + offset * 7);
+const day = now.getDay();
+const monday = new Date(now);
+monday.setDate(now.getDate() - ((day + 6) % 7));
+return Array.from({ length: 7 }, (_, i) => {
+const d = new Date(monday);
+d.setDate(monday.getDate() + i);
+return d;
+});
+}
+
+function formatDate(d) {
+return `${d.getDate()} ${d.toLocaleString("default", { month: "short" })}`;
+}
+
+function isToday(d) {
+const t = new Date();
+return (
+d.getDate() === t.getDate() &&
+d.getMonth() === t.getMonth() &&
+d.getFullYear() === t.getFullYear()
+);
+}
+
+function isFuture(d) {
+const t = new Date();
+t.setHours(0, 0, 0, 0);
+const comp = new Date(d);
+comp.setHours(0, 0, 0, 0);
+return comp > t;
+}
+
+const STORAGE_KEY = “habit-tracker-data”;
+
+export default function HabitTracker() {
+const [weekOffset, setWeekOffset] = useState(0);
+const [data, setData] = useState({});
+const [loaded, setLoaded] = useState(false);
+const [streak, setStreak] = useState(0);
+
+// Load from storage
+useEffect(() => {
+(async () => {
+try {
+const result = await window.storage.get(STORAGE_KEY);
+if (result?.value) {
+setData(JSON.parse(result.value));
+}
+} catch (e) {
+// No data yet
+}
+setLoaded(true);
+})();
+}, []);
+
+// Save to storage
+useEffect(() => {
+if (!loaded) return;
+(async () => {
+try {
+await window.storage.set(STORAGE_KEY, JSON.stringify(data));
+} catch (e) {
+console.error(“Save failed”, e);
+}
+})();
+}, [data, loaded]);
+
+// Calculate streak
+useEffect(() => {
+let s = 0;
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+for (let i = 0; i < 365; i++) {
+const d = new Date(today);
+d.setDate(today.getDate() - i);
+const key = d.toISOString().split(“T”)[0];
+const dayData = data[key];
+if (dayData) {
+const checked = HABITS.filter((h) => dayData[h.id]);
+if (checked.length >= 3) {
+s++;
+} else if (i > 0) {
+break;
+}
+} else if (i > 0) {
+break;
+}
+}
+setStreak(s);
+}, [data]);
+
+const weekDates = getWeekDates(weekOffset);
+const weekLabel = `${formatDate(weekDates[0])} — ${formatDate(weekDates[6])}`;
+const todayMotivation = MOTIVATIONS[new Date().getDay()];
+
+const toggle = useCallback(
+(dateStr, habitId) => {
+setData((prev) => {
+const dayData = prev[dateStr] || {};
+return {
+…prev,
+[dateStr]: { …dayData, [habitId]: !dayData[habitId] },
+};
+});
+},
+[]
+);
+
+const getWeekScore = () => {
+let done = 0;
+let total = 0;
+weekDates.forEach((d) => {
+if (!isFuture(d)) {
+const key = d.toISOString().split(“T”)[0];
+HABITS.forEach((h) => {
+total++;
+if (data[key]?.[h.id]) done++;
+});
+}
+});
+return total > 0 ? Math.round((done / total) * 100) : 0;
+};
+
+const score = getWeekScore();
+
+if (!loaded)
+return (
+<div style={styles.loadingContainer}>
+<div style={styles.loadingPulse}>Loading…</div>
+</div>
+);
+
+return (
+<div style={styles.container}>
+{/* Header */}
+<div style={styles.header}>
+<div style={styles.headerTop}>
+<div>
+<h1 style={styles.title}>DAILY DISCIPLINE</h1>
+<p style={styles.subtitle}>Show up. Track. Repeat.</p>
+</div>
+<div style={styles.streakBadge}>
+<span style={styles.streakNum}>{streak}</span>
+<span style={styles.streakLabel}>day streak</span>
+</div>
+</div>
+<div style={styles.motivationBar}>
+<span style={styles.motivationText}>{todayMotivation}</span>
+</div>
+</div>
+
+```
+  {/* Week Navigation */}
+  <div style={styles.weekNav}>
+    <button style={styles.navBtn} onClick={() => setWeekOffset((w) => w - 1)}>
+      ←
+    </button>
+    <span style={styles.weekLabel}>
+      {weekOffset === 0 ? "This Week" : weekLabel}
+    </span>
+    <button
+      style={{
+        ...styles.navBtn,
+        opacity: weekOffset >= 0 ? 0.3 : 1,
+        pointerEvents: weekOffset >= 0 ? "none" : "auto",
+      }}
+      onClick={() => setWeekOffset((w) => Math.min(w + 1, 0))}
+    >
+      →
+    </button>
+  </div>
+
+  {/* Progress Bar */}
+  <div style={styles.progressContainer}>
+    <div style={styles.progressBg}>
+      <div
+        style={{
+          ...styles.progressFill,
+          width: `${score}%`,
+          background:
+            score >= 80
+              ? "linear-gradient(90deg, #4CAF50, #66BB6A)"
+              : score >= 50
+              ? "linear-gradient(90deg, #E8913A, #FFA726)"
+              : "linear-gradient(90deg, #EF5350, #E57373)",
+        }}
+      />
+    </div>
+    <span style={styles.progressLabel}>{score}% this week</span>
+  </div>
+
+  {/* Tracker Grid */}
+  <div style={styles.grid}>
+    {/* Day headers */}
+    <div style={styles.gridHeader}>
+      <div style={styles.habitLabelHeader}></div>
+      {weekDates.map((d, i) => (
+        <div
+          key={i}
+          style={{
+            ...styles.dayHeader,
+            ...(isToday(d) ? styles.dayHeaderToday : {}),
+          }}
+        >
+          <span style={styles.dayName}>{DAYS[i]}</span>
+          <span style={styles.dayDate}>{d.getDate()}</span>
+        </div>
+      ))}
+    </div>
+
+    {/* Habit rows */}
+    {HABITS.map((habit) => (
+      <div key={habit.id} style={styles.habitRow}>
+        <div style={styles.habitLabel}>
+          <span style={styles.habitEmoji}>{habit.emoji}</span>
+          <span style={styles.habitName}>{habit.label}</span>
+        </div>
+        {weekDates.map((d, i) => {
+          const key = d.toISOString().split("T")[0];
+          const checked = data[key]?.[habit.id];
+          const future = isFuture(d);
+          const today = isToday(d);
+          return (
+            <button
+              key={i}
+              onClick={() => !future && toggle(key, habit.id)}
+              style={{
+                ...styles.cell,
+                ...(today ? styles.cellToday : {}),
+                ...(future ? styles.cellFuture : {}),
+                ...(checked
+                  ? {
+                      background: habit.color,
+                      borderColor: habit.color,
+                      boxShadow: `0 2px 8px ${habit.color}44`,
+                    }
+                  : {}),
+              }}
+            >
+              {checked && <span style={styles.check}>✓</span>}
+              {future && <span style={styles.locked}>·</span>}
+            </button>
+          );
+        })}
+      </div>
+    ))}
+  </div>
+
+  {/* Today's Summary */}
+  <div style={styles.todaySummary}>
+    <h3 style={styles.todayTitle}>Today's Score</h3>
+    <div style={styles.todayHabits}>
+      {HABITS.map((h) => {
+        const todayKey = new Date().toISOString().split("T")[0];
+        const done = data[todayKey]?.[h.id];
+        return (
+          <span
+            key={h.id}
+            style={{
+              ...styles.todayPill,
+              background: done ? h.color : "rgba(255,255,255,0.06)",
+              color: done ? "#fff" : "#666",
+              borderColor: done ? h.color : "rgba(255,255,255,0.1)",
+            }}
+          >
+            {h.emoji} {done ? "Done" : "Pending"}
+          </span>
+        );
+      })}
+    </div>
+  </div>
+
+  {/* Rules */}
+  <div style={styles.rules}>
+    <p style={styles.rule}>
+      <strong style={{ color: "#E8913A" }}>Rule 1:</strong> Never miss two days
+      in a row
+    </p>
+    <p style={styles.rule}>
+      <strong style={{ color: "#4CAF50" }}>Rule 2:</strong> 3+ habits/day =
+      streak continues
+    </p>
+    <p style={styles.rule}>
+      <strong style={{ color: "#5C6BC0" }}>Rule 3:</strong> Phone in another room
+      by 10:30 PM
+    </p>
+  </div>
+
+  {/* Reset */}
+  <button
+    style={styles.resetBtn}
+    onClick={() => {
+      if (confirm("Reset all data? This cannot be undone.")) {
+        setData({});
+      }
+    }}
+  >
+    Reset All Data
+  </button>
+</div>
+```
+
+);
+}
+
+const styles = {
+container: {
+minHeight: “100vh”,
+background: “linear-gradient(180deg, #0D0D0F 0%, #141418 50%, #0D0D0F 100%)”,
+color: “#E8E6E1”,
+fontFamily: “‘JetBrains Mono’, ‘SF Mono’, ‘Fira Code’, monospace”,
+padding: “20px 16px”,
+maxWidth: 720,
+margin: “0 auto”,
+},
+loadingContainer: {
+minHeight: “100vh”,
+display: “flex”,
+alignItems: “center”,
+justifyContent: “center”,
+background: “#0D0D0F”,
+color: “#666”,
+fontFamily: “monospace”,
+},
+loadingPulse: { animation: “pulse 1.5s ease-in-out infinite” },
+header: { marginBottom: 24 },
+headerTop: {
+display: “flex”,
+justifyContent: “space-between”,
+alignItems: “flex-start”,
+marginBottom: 12,
+},
+title: {
+fontSize: 22,
+fontWeight: 800,
+letterSpacing: “3px”,
+color: “#F5F0E8”,
+margin: 0,
+},
+subtitle: {
+fontSize: 11,
+color: “#666”,
+letterSpacing: “1.5px”,
+textTransform: “uppercase”,
+marginTop: 4,
+},
+streakBadge: {
+display: “flex”,
+flexDirection: “column”,
+alignItems: “center”,
+background: “rgba(232, 145, 58, 0.12)”,
+border: “1px solid rgba(232, 145, 58, 0.25)”,
+borderRadius: 12,
+padding: “8px 16px”,
+},
+streakNum: { fontSize: 28, fontWeight: 800, color: “#E8913A”, lineHeight: 1 },
+streakLabel: {
+fontSize: 9,
+color: “#E8913A”,
+textTransform: “uppercase”,
+letterSpacing: “1.5px”,
+marginTop: 2,
+},
+motivationBar: {
+background: “rgba(255,255,255,0.03)”,
+border: “1px solid rgba(255,255,255,0.06)”,
+borderRadius: 8,
+padding: “10px 14px”,
+},
+motivationText: {
+fontSize: 12,
+color: “#999”,
+fontStyle: “italic”,
+letterSpacing: “0.3px”,
+},
+weekNav: {
+display: “flex”,
+justifyContent: “space-between”,
+alignItems: “center”,
+marginBottom: 16,
+},
+navBtn: {
+background: “rgba(255,255,255,0.05)”,
+border: “1px solid rgba(255,255,255,0.1)”,
+color: “#E8E6E1”,
+borderRadius: 8,
+padding: “6px 14px”,
+cursor: “pointer”,
+fontSize: 16,
+fontFamily: “monospace”,
+},
+weekLabel: { fontSize: 13, color: “#888”, letterSpacing: “0.5px” },
+progressContainer: {
+display: “flex”,
+alignItems: “center”,
+gap: 12,
+marginBottom: 20,
+},
+progressBg: {
+flex: 1,
+height: 6,
+background: “rgba(255,255,255,0.06)”,
+borderRadius: 3,
+overflow: “hidden”,
+},
+progressFill: {
+height: “100%”,
+borderRadius: 3,
+transition: “width 0.5s ease”,
+},
+progressLabel: { fontSize: 12, color: “#888”, minWidth: 90, textAlign: “right” },
+grid: { marginBottom: 24 },
+gridHeader: {
+display: “grid”,
+gridTemplateColumns: “1fr repeat(7, 40px)”,
+gap: 4,
+marginBottom: 6,
+alignItems: “end”,
+},
+habitLabelHeader: {},
+dayHeader: {
+display: “flex”,
+flexDirection: “column”,
+alignItems: “center”,
+padding: “4px 0”,
+borderRadius: 6,
+},
+dayHeaderToday: {
+background: “rgba(232, 145, 58, 0.1)”,
+border: “1px solid rgba(232, 145, 58, 0.2)”,
+},
+dayName: {
+fontSize: 10,
+color: “#666”,
+textTransform: “uppercase”,
+letterSpacing: “1px”,
+},
+dayDate: { fontSize: 13, color: “#aaa”, fontWeight: 600 },
+habitRow: {
+display: “grid”,
+gridTemplateColumns: “1fr repeat(7, 40px)”,
+gap: 4,
+marginBottom: 4,
+alignItems: “center”,
+},
+habitLabel: {
+display: “flex”,
+alignItems: “center”,
+gap: 6,
+overflow: “hidden”,
+},
+habitEmoji: { fontSize: 14, flexShrink: 0 },
+habitName: {
+fontSize: 11,
+color: “#bbb”,
+whiteSpace: “nowrap”,
+overflow: “hidden”,
+textOverflow: “ellipsis”,
+},
+cell: {
+width: 40,
+height: 40,
+borderRadius: 8,
+border: “1px solid rgba(255,255,255,0.08)”,
+background: “rgba(255,255,255,0.03)”,
+display: “flex”,
+alignItems: “center”,
+justifyContent: “center”,
+cursor: “pointer”,
+transition: “all 0.2s ease”,
+},
+cellToday: {
+border: “1px solid rgba(232, 145, 58, 0.3)”,
+},
+cellFuture: {
+opacity: 0.3,
+cursor: “default”,
+},
+check: { color: “#fff”, fontSize: 16, fontWeight: 700 },
+locked: { color: “#444”, fontSize: 18 },
+todaySummary: {
+background: “rgba(255,255,255,0.03)”,
+border: “1px solid rgba(255,255,255,0.06)”,
+borderRadius: 12,
+padding: 16,
+marginBottom: 20,
+},
+todayTitle: {
+fontSize: 13,
+color: “#888”,
+textTransform: “uppercase”,
+letterSpacing: “1.5px”,
+margin: “0 0 12px”,
+},
+todayHabits: {
+display: “flex”,
+flexWrap: “wrap”,
+gap: 8,
+},
+todayPill: {
+fontSize: 11,
+padding: “5px 10px”,
+borderRadius: 20,
+border: “1px solid”,
+letterSpacing: “0.3px”,
+},
+rules: {
+background: “rgba(255,255,255,0.02)”,
+border: “1px solid rgba(255,255,255,0.05)”,
+borderRadius: 10,
+padding: 14,
+marginBottom: 20,
+},
+rule: { fontSize: 11, color: “#777”, margin: “6px 0”, lineHeight: 1.5 },
+resetBtn: {
+width: “100%”,
+background: “transparent”,
+border: “1px solid rgba(239, 83, 80, 0.2)”,
+color: “#EF5350”,
+borderRadius: 8,
+padding: “10px”,
+cursor: “pointer”,
+fontSize: 11,
+fontFamily: “monospace”,
+letterSpacing: “1px”,
+textTransform: “uppercase”,
+},
+};
